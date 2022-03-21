@@ -1,0 +1,162 @@
+<html lang="en" dir="ltr">
+  <head>
+    <title>Vanilla Boilerplate</title>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	    <script src="https://cdn.jsdelivr.net/npm/web3@latest/dist/web3.min.js"></script>
+        <script src="https://npmcdn.com/moralis@0.0.6/dist/moralis.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/phaser@3.55.2/dist/phaser.min.js"></script>
+  </head>
+
+  <body>
+
+    <button id="btn-login">Moralis Login</button>
+    <button id="btn-logout">Logout</button>
+    <br><br>
+    <script>
+      // connect to Moralis server
+      Moralis.initialize("TSkdPdyJlRBnllze05tQCQlyuSulR5YnvDwnZfH6");
+      Moralis.serverURL = "https://siitjhpb5kkv.bigmoralis.com:2053/server";
+
+      // add from here down
+      async function login() {
+        let user = Moralis.User.current();
+        if (!user) {
+          user = await Moralis.Web3.authenticate();
+          launch(); 
+        }
+        console.log("logged in user:", user);
+      }
+
+      async function logOut() {
+        await Moralis.User.logOut();
+        console.log("logged out");
+        location.reload(); // when I log out I want the page to reload and exit the game
+      }
+
+      
+
+      document.getElementById("btn-login").onclick = login;
+      document.getElementById("btn-logout").onclick = logOut;
+
+      var config = {
+        type: Phaser.AUTO,
+        width: 800,
+        height: 600,
+        physics: {
+            default: 'arcade', // different games have different physics types
+            arcade: { // this game has arcade
+                gravity: { y: 300 }, // it has gravity with strength of 300
+                debug: true
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+        var game;
+        
+        var platforms;
+        var player;
+        var cursor; 
+
+        var jumpHeight = -300;
+
+        function launch() {
+          let user = Moralis.User.current();
+          if (!user) {
+            console.log('Please login with Metamask');
+          }
+          else {
+            console.log(user.get('ethAddress') + ' ' + 'logged in' );
+            game = new Phaser.Game(config);
+          }
+        }
+
+        launch(); 
+
+        // loading assets 
+        function preload ()
+        {
+            // pictures, images, sound, movies
+            this.load.image('background', '/Users/raash/Documents/gotchi-game/assets/BG.png');
+            this.load.image('ground', 'assets/Tiles/Tile (2).png');
+            this.load.image('player', 'assets/player.png');
+        }
+
+        // initial setup 
+        function create ()
+        {
+            // put background, load animations, create animations, put players on map
+            this.add.image(400, 300, 'background').setScale(1.55); // middle of the page of 800x600 page size
+
+            platforms = this.physics.add.staticGroup(); // when player hits platform they need to stay on the platform
+            
+            platforms.create(470, 400, 'ground').setScale(1.75).refreshBody(); // collision box (area on which the player jumps on when touched) remains at the original image size unless you refresh it once you have made your image smaller.             
+            platforms.create(535, 400, 'ground').setScale(1.75).refreshBody(); // each tile is 65 wide so they can be at a 65 distance on x axis
+            platforms.create(600, 400, 'ground').setScale(1.75).refreshBody();
+            platforms.create(665, 400, 'ground').setScale(1.75).refreshBody(); 
+
+            player = this.physics.add.sprite(500, 250, 'player').setScale(1.5).refreshBody(); // he's responding to gravity cause he's not in the static group, he is a sprite - he responds to acceleration, speed, gravity, and so forth
+            player.setBounce(0.3);
+
+            this.physics.add.collider(player, platforms); // two groups of physical platforms - first should collide with second group, in multiplayer games you want some players to collide with each other and some to pass through, you use this logic
+
+            cursors = this.input.keyboard.createCursorKeys(); // This populates the cursors object with four properties: up, down, left, right, that are all instances of Key objects. 
+          }
+
+        // game loop - 60 times per second - 60 frames per second
+        function update ()
+        {
+            // logic - what do you wanna do every time this is being called? 
+            // do you want to check if the player is hitting a wall or being shot by a bullet? 
+            // if yes then decrease health 
+
+            if (cursors.left.isDown)
+              {
+                  player.setVelocityX(-160); // if left is down, push it to the left, that's the physics force applied 
+
+              }
+              else if (cursors.right.isDown)
+              {
+                  player.setVelocityX(160); 
+
+              }
+              else
+              {
+                  player.setVelocityX(0);
+
+              }
+
+              if (cursors.up.isDown && player.body.touching.down)
+              {
+                  player.setVelocityY(jumpHeight);
+              }
+
+              if (player.lastX!=player.x || player.lastY!=player.y) { // check if the player moved somewhere
+                let user = Moralis.User.current();
+                
+                const PlayerPosition = Moralis.Object.extend('PlayerPosition'); // PlayerPosition is a new class in the database created that did not exist 
+                const playerPosition = new PlayerPosition(); // playerPosition object is an instance of moralis' extention of PlayerPosition 
+                
+                playerPosition.set('player',user.get('ethAddress')); 
+                playerPosition.set('x',player.x); // set player x and y 
+                playerPosition.set('y', player.y);
+
+                player.lastX = player.x; // only run the if block if the player position has actually changed 
+                player.lastY = player.y; 
+                
+                await playerPosition.save(); 
+              }
+
+        }  
+
+    </script>
+
+  </body>
+
+
+</html>
